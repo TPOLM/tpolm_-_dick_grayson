@@ -1,0 +1,1431 @@
+<!DOCTYPE html>
+<html>
+ <head>
+ 	<title>TPOLM - Dick Grayson's Darkest Secrets (Payback 2015)</title>
+	<meta charset="UTF-8">
+  	<link rel="stylesheet" type="text/css" href="css/index.css" />
+	<script src="requestanimationframe.js"></script>
+	<script src="sayings.js"></script>
+  	<script type="application/javascript">
+
+rand = function(n){
+	return Math.floor(Math.random()*n);
+};
+
+var rms = 0;
+
+var is_chrome = navigator.userAgent.indexOf('Chrome') > -1;
+//var is_explorer = navigator.userAgent.indexOf('MSIE') > -1;
+//var is_firefox = navigator.userAgent.indexOf('Firefox') > -1;
+var is_safari = navigator.userAgent.indexOf("Safari") > -1;
+//var is_opera = navigator.userAgent.indexOf("Presto") > -1;
+if ((is_chrome)&&(is_safari)) {is_safari=false;}
+
+var loading = [
+	'fthr/robin1.png',
+	'fthr/robin_riding2_1.png',
+	'fthr/robin_riding2_2.png',
+	'optic/final_robin.png',
+	'internet/wood.jpg', // original Wallpapers-room_com___Wooden_Noir_Wallpaper_Pack_by_shod4n_1920x1200.png
+	'internet/hsk2.png', // original photo by Marcus Klepper 
+	'internet/Kapow_by_Teakster.jpg' // http://teakster.deviantart.com/art/Kapow-172173540
+	];
+var loading_counter = 0;
+var robin = [];
+
+function init() {
+	var d = new Date();
+	var timestamp = d.getTime();
+	for (var i = 0; i < loading.length; i++) {
+		var image = new Image();
+		
+		image.onload = function() {
+			//context.drawImage(imageObj, 69, 50);
+			console.log('done loading ' + this.src);
+			//console.log(this);
+			checkLoadingDone();
+		};
+		image.src = loading[i]+'?'+timestamp; // timestamp to prevent cache breaking our onload callback
+		
+		robin.push(image);
+	}
+}
+
+function checkLoadingDone() {
+	loading_counter++;
+	if (loading_counter >= loading.length) {
+		initSound();
+	}
+}
+
+var audioContext;
+
+function initSound() {
+	
+	try {
+		// Fix up for prefixing
+		window.AudioContext = window.AudioContext||window.webkitAudioContext;
+		audioContext = new AudioContext();
+
+		var request = new XMLHttpRequest();		
+		if (is_safari) request.open('GET', 'dascon/dascon-payback.m4a', true);
+			else request.open('GET', 'dascon/dascon-payback.ogg', true);
+		request.responseType = 'arraybuffer';
+		console.log('requesting');
+
+		// Decode asynchronously
+		request.onload = function() {
+			decode(request.response);
+		}
+		request.send();
+
+	} catch(e) {
+		console.log('Web Audio API is not supported in this browser');
+		drawCanvas();
+	}
+
+}
+
+var levelChecker;
+
+var decode = function(response) {
+	audioContext.decodeAudioData(response, function(buffer) {
+
+		backgroundAudio = audioContext.createBufferSource(); 	// creates a sound source
+		backgroundAudio.buffer = buffer;                    // tell the source which sound to play
+		backgroundAudio.connect(audioContext.destination);       // connect the source to the context's destination (the speakers)
+		backgroundAudio.loop = true;
+		backgroundAudio.start(0);
+
+		levelChecker = audioContext.createScriptProcessor(2048, 1, 2);
+		backgroundAudio.connect(levelChecker);
+		levelChecker.connect(audioContext.destination);
+		levelChecker.onaudioprocess = process;
+		console.log('audio playing');
+	
+		// start canvas
+		drawCanvas();
+
+	}, function(evt) {
+		console.log('failed to load buffer');
+		console.log(evt);
+	});
+}
+
+var process = function(e) {
+	var buffer = e.inputBuffer.getChannelData(0);
+	var len = buffer.length; 
+	var total = 0;
+	var i = 0;
+	while ( i < len ) total += Math.abs( buffer[i++] );
+	rms = (rms + Math.sqrt( total / len )) * 0.5;
+	//console.log(rms);
+}
+
+var w;
+var h;
+var centerX;
+var centerY;
+var ctx;
+var oangle;
+
+//var fps = 0;
+//var framecounter = true;
+//var fpsFilter = 60;
+
+var clip = false;
+var attractor = false;
+var changecolor = false;
+var seedindex = 0;
+
+var firestarter = 0;
+var starttime = 0;
+var tap = 0;
+
+var cnum = 16;
+var mul = 2;
+
+var elevatorchange = false;
+
+function drawCanvas() {
+
+	resize();
+
+	var num = 45;
+	var angle = (Math.PI*2)/num;
+	var size = 60;
+	var opening, phase1, phase2;
+	var maxj = 10;
+	
+	var blobnum = 250;
+	var blobsize = 80;
+	var blobangle = (Math.PI*2)/blobnum;
+	
+	function drawMirror() {
+		//ctx.clearRect(0,0,w,h);
+		ctx.drawImage(robin[4],0,0,w,h);
+		
+		var d = new Date();
+		var timer = d.getTime();
+		
+		phase1 = (firestarter-timer)/25000;
+		phase2 = (firestarter-timer)/2500;
+		
+		for (var j=0; j<maxj; j++) {
+		
+			var posX = w*(0.5);// + Math.sin(phase2*0.25)*j*10;
+			var posY = h*(0.5);// - Math.cos(phase2*0.25)*j*10;
+		
+			var thisb = parseInt(Math.sin(phase2*0.5 + j)*35+120, 10);
+			if (changecolor) color = "rgba(255,255,0,"+(0.12*((maxj-j)/maxj)+rms*0.25)+")";
+			 else color = "rgba(0,155,0,"+(0.12*((maxj-j)/maxj)+rms*0.25)+")";
+			ctx.fillStyle = color;
+			var i = seedindex;
+			opening = Math.sin(i*angle)*10 + j*20;
+			
+			ctx.save();
+			
+			// clip left
+			if (clip) {
+				ctx.beginPath();
+				ctx.moveTo(0,0);
+				ctx.lineTo(posX,0);
+				ctx.lineTo(posX,h);
+				ctx.lineTo(0,h);
+				ctx.clip();
+			}
+			
+			// draw left
+			ctx.translate( posX, posY );
+			ctx.translate( Math.sin(i*angle+phase1)*opening, Math.cos(i*angle+phase1)*opening );
+			ctx.rotate(i*angle+Math.sin(phase2+Math.sin(i*angle)+j*0.5)*3);
+			ctx.beginPath();
+			ctx.moveTo(-size*.5*j,-size*.5*j);
+			ctx.lineTo(0,size);
+			ctx.lineTo(size*.5*j,-size*.5*j);
+			ctx.fill();
+			ctx.closePath();
+			
+			ctx.restore();
+			
+			
+			
+			ctx.save();
+			
+			// clip right
+			if (clip) {
+				ctx.beginPath();
+				ctx.moveTo(posX,0);
+				ctx.lineTo(w,0);
+				ctx.lineTo(w,h);
+				ctx.lineTo(posX,h);
+				ctx.clip();
+			}
+						
+			// draw right
+			ctx.translate( posX, posY );
+			ctx.scale(-1,1);
+			ctx.translate( Math.sin(i*angle+phase1)*opening, Math.cos(i*angle+phase1)*opening );
+			ctx.rotate(i*angle+Math.sin(phase2+Math.sin(i*angle)+j*0.5)*3);
+			ctx.beginPath();
+			ctx.moveTo(-size*.5*j,-size*.5*j);
+			ctx.lineTo(0,size);
+			ctx.lineTo(size*.5*j,-size*.5*j);
+			ctx.fill();
+			ctx.closePath();
+			ctx.restore();
+			
+			
+		}
+		
+	}
+	
+	function drawShape(centerX, centerY, rotAngle, scaleX, scaleY, posX, posY, angle, size, height) {
+		ctx.translate( centerX, centerY );
+		ctx.rotate(rotAngle);
+		ctx.scale( scaleX, scaleY );
+		ctx.translate( posX, posY );
+		ctx.rotate(angle);
+		ctx.beginPath();
+		ctx.moveTo(-size,-size);
+		ctx.lineTo(0,height*2);
+		ctx.lineTo(size,-size);
+		ctx.fill();
+		//ctx.closePath();
+	}
+
+	function drawKaleidoscope() {
+		//ctx.clearRect(0,0,w,h);
+		ctx.drawImage(robin[4],0,0,w,h);
+		
+		var d = new Date();
+		var timer = d.getTime();
+		
+		/*if (framecounter) {
+			var thisFrameFPS = 1000 / (timer - lastUpdate);
+			if (timer!=lastUpdate){
+				fps += (thisFrameFPS - fps) / fpsFilter;
+				lastUpdate = timer;
+			}
+		}*/
+		
+		phase1 = (firestarter-timer)/25000;
+		phase2 = (firestarter-timer)/2500;
+		
+		var diagonal = 105 + Math.sin(phase2 + rms)*20;
+		
+		for (var j=0; j<maxj; j++) {
+		
+			var thisb = parseInt(Math.sin(phase2*0.5 + j)*35+120, 10);
+			color = "rgba(255,"+(95-thisb - parseInt(rms*30,10))+",0,"+(0.2*((maxj-j)/maxj))+")";
+			ctx.fillStyle = color;
+			var i = seedindex;
+			opening = Math.sin(i*angle)*10 + j*20;
+			
+			ctx.save();
+			
+			// clip top-left
+			if (clip) {
+				//ctx.fillStyle = "rgba(0,0,0,1.0)";
+				ctx.beginPath();
+				ctx.moveTo(0,0);
+				ctx.lineTo(centerX,0);
+				ctx.lineTo(centerX,centerY);
+				//ctx.lineTo(0,0);
+				//ctx.fill();
+				ctx.clip();
+				ctx.closePath();
+			}
+		
+			drawShape( 	centerX, centerY, 0,
+						1.0, 1.0,
+						Math.sin(i*angle+phase1)*opening - diagonal, Math.cos(i*angle+phase1)*opening - diagonal,
+						i*angle+Math.sin(phase2+Math.sin(i*angle)+j*0.5)*3,
+						size*.5*j,
+						size);
+			
+			ctx.restore();
+			
+			
+			
+			ctx.save();
+			
+			// clip top-right
+			if (clip) {
+				ctx.beginPath();
+				ctx.moveTo(centerX,0);
+				ctx.lineTo(w,0);
+				ctx.lineTo(centerX,centerY);
+				ctx.clip();
+			}
+						
+			drawShape( 	centerX, centerY, 0,
+						-1.0, 1.0,
+						Math.sin(i*angle+phase1)*opening - diagonal, Math.cos(i*angle+phase1)*opening - diagonal,
+						i*angle+Math.sin(phase2+Math.sin(i*angle)+j*0.5)*3,
+						size*.5*j,
+						size);
+			
+			ctx.restore();
+			
+			
+			
+			
+			ctx.save();
+			
+			// clip right-top
+			if (clip) {
+				ctx.beginPath();
+				ctx.moveTo(centerX,centerY);
+				ctx.lineTo(w,0);
+				ctx.lineTo(w,centerY);
+				ctx.clip();
+			}
+						
+			drawShape( 	centerX, centerY, oangle,
+						1.0, 1.0,
+						Math.sin(i*angle+phase1)*opening - diagonal, Math.cos(i*angle+phase1)*opening - diagonal,
+						i*angle+Math.sin(phase2+Math.sin(i*angle)+j*0.5)*3,
+						size*.5*j,
+						size);
+			
+			ctx.restore();
+			
+			
+			
+			ctx.save();
+			
+			// clip right-bottom
+			if (clip) {
+				ctx.beginPath();
+				ctx.moveTo(centerX,centerY);
+				ctx.lineTo(w,centerY);
+				ctx.lineTo(w,h);
+				ctx.clip();
+			}
+						
+			drawShape( 	centerX, centerY, -oangle,
+						1.0, -1.0,
+						Math.sin(i*angle+phase1)*opening - diagonal, Math.cos(i*angle+phase1)*opening - diagonal,
+						i*angle+Math.sin(phase2+Math.sin(i*angle)+j*0.5)*3,
+						size*.5*j,
+						size);
+			
+			ctx.restore();
+			
+			
+			
+			ctx.save();
+			// clip bottom-left
+			if (clip) {
+				ctx.beginPath();
+				ctx.moveTo(0,h);
+				ctx.lineTo(centerX,centerY);
+				ctx.lineTo(centerX,h);
+				ctx.clip();
+			}
+						
+			drawShape( 	centerX, centerY, 0,
+						1.0, -1.0,
+						Math.sin(i*angle+phase1)*opening - diagonal, Math.cos(i*angle+phase1)*opening - diagonal,
+						i*angle+Math.sin(phase2+Math.sin(i*angle)+j*0.5)*3,
+						size*.5*j,
+						size);
+			
+			ctx.restore();
+			
+			
+			
+			ctx.save();
+			// clip bottom-right
+			if (clip) {
+				ctx.beginPath();
+				ctx.moveTo(centerX,centerY);
+				ctx.lineTo(w,h);
+				ctx.lineTo(centerX,h);
+				ctx.clip();
+			}
+						
+			drawShape( 	centerX, centerY, 0,
+						-1.0, -1.0,
+						Math.sin(i*angle+phase1)*opening - diagonal, Math.cos(i*angle+phase1)*opening - diagonal,
+						i*angle+Math.sin(phase2+Math.sin(i*angle)+j*0.5)*3,
+						size*.5*j,
+						size);
+			
+			ctx.restore();
+			
+			
+			
+			ctx.save();
+			
+			// clip right-bottom
+			if (clip) {
+				ctx.beginPath();
+				ctx.moveTo(centerX,centerY);
+				ctx.lineTo(0,h);
+				ctx.lineTo(0,centerY);
+				ctx.clip();
+			}
+						
+			drawShape( 	centerX, centerY, oangle,
+						-1.0, -1.0,
+						Math.sin(i*angle+phase1)*opening - diagonal, Math.cos(i*angle+phase1)*opening - diagonal,
+						i*angle+Math.sin(phase2+Math.sin(i*angle)+j*0.5)*3,
+						size*.5*j,
+						size);
+			
+			ctx.restore();
+			
+			
+			ctx.save();
+			
+			// clip right-top
+			if (clip) {
+				ctx.beginPath();
+				ctx.moveTo(centerX,centerY);
+				ctx.lineTo(0,centerY);
+				ctx.lineTo(0,0);
+				ctx.clip();
+			}
+						
+			drawShape( 	centerX, centerY, -oangle,
+						-1.0, 1.0,
+						Math.sin(i*angle+phase1)*opening - diagonal, Math.cos(i*angle+phase1)*opening - diagonal,
+						i*angle+Math.sin(phase2+Math.sin(i*angle)+j*0.5)*3,
+						size*.5*j,
+						size);
+			
+			ctx.restore();
+
+		}
+		
+	}
+	
+	
+	
+	function drawCircles() {
+		ctx.clearRect(0,0,w,h);
+		//ctx.drawImage(robin[4],0,0,w,h);
+		
+		var d = new Date();
+		var timer = d.getTime();
+		
+		/*if (framecounter) {
+			var thisFrameFPS = 1000 / (timer - lastUpdate);
+			if (timer!=lastUpdate){
+				fps += (thisFrameFPS - fps) / fpsFilter;
+				lastUpdate = timer;
+			}
+		}*/
+		
+		phase1 = (firestarter-timer)/25000;
+		phase2 = (firestarter-timer)/1000;
+		
+		color = "rgba(0,75,0,1.0)";
+		ctx.fillStyle = color;
+		ctx.beginPath();
+		ctx.rect(0,0,w,h);
+		ctx.fill();
+		ctx.closePath();
+		
+		var size = w/cnum;
+		var halfsize = size*0.25;
+		
+		ctx.fillStyle = "rgba(200,0,0,0.2)";
+	
+		for (var thisx=0; thisx<w; thisx += size) {
+			for (var thisy=0; thisy<h; thisy += size) {
+				ctx.strokeStyle = "rgba(255,255,0,0.2)";
+				ctx.lineWidth = 4;
+				ctx.beginPath();
+				ctx.arc(
+					thisx + halfsize,
+					thisy + halfsize,
+					(halfsize + (Math.cos(phase2 + thisx + thisy + 30000) - Math.sin(phase1 + thisx)+1.0)*halfsize),
+					0,
+					2*Math.PI);
+				ctx.fill();
+				ctx.stroke();
+			}
+		}
+
+	}
+
+	function drawRobinLogo() {
+		ctx.translate(-415,-210);
+		ctx.beginPath();
+		ctx.moveTo(156.90323,367.58065);
+		ctx.bezierCurveTo(100.53272,348.08495,53.598138,305.52361,22.135269,255.63412);
+		ctx.bezierCurveTo(-3.7461131,205.2105,11.518483,139.37675,55.612974,104.19995);
+		ctx.bezierCurveTo(79.15616,82.275731,106.63309,64.013984,137.29032,53.774194);
+		ctx.bezierCurveTo(135.99169,99.141322,186.40868,118.32051000000001,219.13987,137.86063000000001);
+		ctx.bezierCurveTo(260.64630999999997,157.32957000000002,307.70619,167.39945,353.48232,164.02908000000002);
+		ctx.bezierCurveTo(388.57030000000003,161.59579000000002,387.49586,116.36230000000002,405.20993,94.95263700000002);
+		ctx.bezierCurveTo(415.11428,85.49346100000002,410.60416,83.32063700000002,414.07583999999997,72.75349900000002);
+		ctx.bezierCurveTo(418.90400999999997,84.02925900000002,415.13597,85.12072100000002,424.08147999999994,93.28243500000002);
+		ctx.bezierCurveTo(436.10195999999996,102.51595000000002,437.63244999999995,162.88962000000004,475.6538699999999,164.45161000000002);
+		ctx.bezierCurveTo(525.4331599999999,164.81278,561.63672,158.49878,607.32553,141.80225000000002);
+		ctx.bezierCurveTo(625.6102,135.82787000000002,659.80714,119.94260000000001,676.92558,109.60045000000002);
+		ctx.bezierCurveTo(703.34017,94.64263100000002,715.47001,75.11059000000003,716.25062,53.97760900000002);
+		ctx.bezierCurveTo(767.59652,80.94510900000003,826.66355,139.07367000000002,824.53529,202.02575000000002);
+		ctx.bezierCurveTo(824.80224,249.92252000000002,794.32663,291.57096,756.12719,317.76873);
+		ctx.bezierCurveTo(734.28943,333.01892,705.14125,353.44705,681.94178,365.45619);
+		ctx.bezierCurveTo(720.04857,337.62791,763.50393,300.78992,762.62773,249.27233999999999);
+		ctx.bezierCurveTo(758.60834,212.95198,730.13846,180.95383999999999,694.62134,172.49874999999997);
+		ctx.bezierCurveTo(649.54136,160.03174999999996,612.0371600000001,170.61400999999998,574.15828,179.33162);
+		ctx.bezierCurveTo(520.92839,198.89609,461.75656,237.69168,424.57331,281.04449);
+		ctx.bezierCurveTo(422.42238,303.4355,422.29345,304.09989,421.07018999999997,320.19226);
+		ctx.bezierCurveTo(419.9106,332.17476999999997,418.751,344.15727,417.59139999999996,356.13978);
+		ctx.bezierCurveTo(414.86737999999997,330.80645,412.14336999999995,305.47310999999996,409.41934999999995,280.13978);
+		ctx.bezierCurveTo(383.75019,257.60675999999995,359.99352999999996,232.58813999999998,333.0616299999999,211.69624);
+		ctx.bezierCurveTo(298.40903999999995,188.01701,259.56866999999994,170.296,217.74080999999993,164.63911);
+		ctx.bezierCurveTo(167.93753999999993,156.60869,108.60306999999993,172.11783,80.93294499999993,217.08570999999998);
+		ctx.bezierCurveTo(57.418039999999934,261.12059,85.55529499999993,312.82847999999996,121.45613999999993,340.53189999999995);
+		ctx.bezierCurveTo(132.80495999999994,350.14388999999994,144.89247999999992,358.82723999999996,156.90322999999995,367.58064999999993);
+		ctx.closePath();
+	}
+	
+	function drawRobinSign() {
+		ctx.clearRect(0,0,w,h);
+		
+		var d = new Date();
+		var timer = d.getTime();
+		
+		/*if (framecounter) {
+			var thisFrameFPS = 1000 / (timer - lastUpdate);
+			if (timer!=lastUpdate){
+				fps += (thisFrameFPS - fps) / fpsFilter;
+				lastUpdate = timer;
+			}
+		}*/
+		
+		phase1 = (firestarter-timer)/25000;
+		phase2 = (firestarter-timer)/1500;
+		
+		color = "rgba(0,200,0,"+(0.1+rms)+")";
+		ctx.fillStyle = color;
+		ctx.beginPath();
+		ctx.rect(0,0,w,h);
+		ctx.fill();
+		ctx.closePath();
+		
+		color = "rgba(200,200,0,1.0)";
+		ctx.fillStyle = color;
+		ctx.strokeStyle = "#000000";
+		ctx.lineWidth = 4;
+		
+		var size = w/num;
+		var halfsize = size*0.5;
+		
+		ctx.save();
+		ctx.translate(w*.5,h*.5);
+		
+		var thisscale = (Math.sin(phase2 + 4000)+1.5)*0.5;
+		ctx.scale(thisscale,thisscale);
+		ctx.rotate(Math.sin(phase2)*33.5);
+		drawRobinLogo();
+		ctx.fill();
+		ctx.stroke();
+		ctx.restore();	
+		
+	}
+	
+	
+	function drawSpyralFlare() {
+		ctx.clearRect(0,0,w,h);
+		//ctx.drawImage(robin[4],0,0,w,h);
+		var d = new Date();
+		var timer = d.getTime();
+		
+		/*if (framecounter) {
+			var thisFrameFPS = 1000 / (timer - lastUpdate);
+			if (timer!=lastUpdate){
+				fps += (thisFrameFPS - fps) / fpsFilter;
+				lastUpdate = timer;
+			}
+		}*/
+		
+		phase1 = (firestarter-timer)/25000;
+		phase2 = (firestarter-timer)/2500;
+		
+		color = "rgba("+parseInt((rms*10),10)+"0,0,0,1.0)";
+		ctx.fillStyle = color;
+		ctx.beginPath();
+		ctx.rect(0,0,w,h);
+		ctx.fill();
+		ctx.closePath();
+		
+		var posX = w*(0.5);
+		var posY = h*(0.5);
+		//var rms = 0.4;
+		
+		//ctx.strokeStyle = "rgba(200,0,0,"+rms+")";
+		//ctx.lineWidth = 2;
+		
+		for (var j=0; j<9; j++) {
+		
+			var thisb = parseInt((Math.sin(phase2*0.5 + j)+1.0)*5, 10);
+			//console.log(thisb);
+			//color = "rgba(255,175,"+thisb+",0.016)";
+			color = "rgba("+(255-thisb)+","+(255-thisb)+",0,"+0.012+")";
+			
+			ctx.fillStyle = color;
+			
+			for (var i=0; i<num; i++) {
+			
+					//if (Math.random()*0.37 > rms) continue; 
+			
+					opening = Math.sin(i*angle)*10 + j*20;
+				
+					//size = 40+Math.sin(timer/1000)*10+Math.sin(timer*(j-numy*.5)/1000)*10;
+					ctx.save();
+					ctx.translate( posX+Math.sin(i*angle+phase1)*opening, posY+Math.cos(i*angle+phase1)*opening );
+					ctx.rotate(i*angle+Math.sin(phase2+Math.sin(i*angle))*4);
+					ctx.beginPath();
+					ctx.moveTo(-size*.5*j,-size*.5*j);
+					ctx.lineTo(0,size);
+					ctx.lineTo(size*.5*j,-size*.5*j);
+					//ctx.lineTo(size*.5,size/2*Math.sqrt(3));
+					
+					ctx.closePath();
+					ctx.fill();
+					//ctx.stroke();
+					ctx.restore();
+			}
+		}
+		
+	}
+	
+	function drawFloatingBlob() {
+		ctx.drawImage(robin[4],0,0,w,h);
+
+		var d = new Date();
+		var timer = d.getTime();
+		
+		/*if (framecounter) {
+			var thisFrameFPS = 1000 / (timer - lastUpdate);
+			if (timer!=lastUpdate){
+				fps += (thisFrameFPS - fps) / fpsFilter;
+				lastUpdate = timer;
+			}
+		}*/
+		
+		color = "rgba(255,0,0,0.05)";
+		ctx.fillStyle = color;
+		
+		phase1 = timer/10000;
+		phase2 = timer/750;
+		
+		ctx.drawImage(robin[0], w*.5, h*.25, w*.5, w*.5);
+		
+		var posX = w*(0.3);
+		var posY = h*(0.5);
+		
+		for (var i=0; i<blobnum; i++) {
+			
+				opening = 180+Math.sin(i*blobangle)*50;
+				
+				ctx.save();
+				ctx.translate( posX+Math.sin(i*blobangle+phase1)*opening, posY+Math.cos(i*blobangle+phase1)*opening );
+				ctx.rotate(i*blobangle+Math.sin(phase2+Math.sin(i*blobangle)));
+				ctx.beginPath();
+				ctx.moveTo(-blobsize*.5,-blobsize*.5);
+				ctx.lineTo(0,blobsize);
+				ctx.lineTo(blobsize*.5,-blobsize*.5);
+				ctx.closePath();
+				ctx.fill();
+
+				ctx.restore();
+		}
+		
+	}
+	
+	function drawElevators() {
+		ctx.clearRect(0,0,w,h);
+		//ctx.drawImage(robin[4],0,0,w,h);
+		var d = new Date();
+		var timer = d.getTime();
+		
+		/*if (framecounter) {
+			var thisFrameFPS = 1000 / (timer - lastUpdate);
+			if (timer!=lastUpdate){
+				fps += (thisFrameFPS - fps) / fpsFilter;
+				lastUpdate = timer;
+			}
+		}*/
+		
+		phase1 = timer/25000;
+		phase2 = timer/2500;
+		phase3 = timer/1000;
+		
+		var affect1 = Math.cos(phase2) - Math.sin(phase1)*Math.sin(phase2);
+		var affect2 = 0.0000001;
+		var affect3 = 5.0;
+		var affect4 = 0.85;
+		var color = "rgba("+155+","+155+","+0+","+0.25+")";
+		
+		if (elevatorchange) {
+			atX = w*.5;//+Math.cos(phase3)*w*.25;
+			atY = h*.5;
+			//atY = h*.5+Math.cos(phase2+phase3)*h*.25;
+			affect1 = -2.0;
+			affect3 = 5.0;
+			affect4 = 0.5;
+			color = "rgba("+175+","+0+","+0+","+0.15+")";
+		}		
+		
+		
+		//var atX = mouseX = 50;
+		//var atY = mouseY = 100;
+		var drag = affect1*50;
+		var mRange = 500;
+		
+		var sizex = size*affect4; //(size*(1.1 - 0.2*affect1) );
+		var sizey = size*1.4; //(size*(1.2 + 0.4*affect1) );
+		for (var thisx=0; thisx<w; thisx += sizex ) {
+			for (var thisy=0; thisy<h; thisy += sizey ) {
+		
+				var posX = thisx;
+				var posY = (timer/(Math.cos(phase2+thisx)*affect2 + affect3) + (thisy)+size) % (h+size); //(phase2+(Math.cos(phase2*0.25)+1.0)*(i/maxj)*5.5*h)%h;
+		
+				if (elevatorchange) {
+					var dx = posX - atX;
+					var dy = posY - atY;
+					var distance = Math.sqrt(dx*dx + dy*dy);
+				
+					if (distance < mRange)
+					{
+						// assign direction to the angle the mouse is from the clip
+						// using dx and dy with atan2
+						var direction = Math.atan2(dy, dx);
+				
+						// a proximity ratio is created to represent how close we are
+						var proximity = 1.0 - distance/mRange;
+						var posZ = drag * proximity;
+				
+						// here the clip is actually moved based on its velocity using
+						// cos and sin to move based on the direction angle (away from center)
+						posX -= posZ * Math.cos(direction);
+						posY -= posZ * Math.sin(direction);
+					}
+				}
+				
+				ctx.fillStyle = color;
+				ctx.save();
+				ctx.translate( posX, posY );
+				//ctx.rotate(thisx*angle+Math.sin(phase2+Math.sin(thisx*angle)+thisy*0.5)*3);
+				ctx.beginPath();
+				ctx.moveTo(-size*.5,-size*.5);
+				ctx.lineTo(-size*.5,size*.5);
+				ctx.lineTo(size*.5,size*.5);
+				ctx.lineTo(size*.5,-size*.5);
+				ctx.fill();
+				ctx.closePath();
+				ctx.restore();
+			
+			
+			}
+		}
+		
+		if (elevatorchange) {
+			color = "rgba(200,200,0,1.0)";
+			ctx.fillStyle = color;
+			ctx.strokeStyle = "#000000";
+			ctx.lineWidth = 5;
+		
+			var thisx = w*.5;
+			var thisy = h*.5;
+			var thisscale = (h*.15+ Math.cos(phase3)*w*.2) / 415;
+			//console.log(thisscale);
+			ctx.save();
+			ctx.translate(atX,atY);
+			//var thisscale = thissize;
+			ctx.scale(thisscale, thisscale);
+			ctx.rotate(Math.cos(phase3)*w*.25*0.05);
+			drawRobinLogo();
+			ctx.fill();
+			ctx.stroke();
+			ctx.restore();
+		}
+		
+	}
+	
+	function drawSpyralLine() {
+		ctx.clearRect(0,0,w,h);
+		//ctx.drawImage(robin[4],0,0,w,h);
+		var d = new Date();
+		var timer = d.getTime();
+		
+		/*if (framecounter) {
+			var thisFrameFPS = 1000 / (timer - lastUpdate);
+			if (timer!=lastUpdate){
+				fps += (thisFrameFPS - fps) / fpsFilter;
+				lastUpdate = timer;
+			}
+		}*/
+		
+		phase1 = (firestarter-timer)/25000;
+		phase2 = (firestarter-timer)/5000;
+		
+		var posX = w*(0.5);
+		var posY = h*(0.5);
+
+		//color = "#FFFF00";
+		color = "rgba("+0+","+155+","+0+","+(0.25+rms)+")";
+		
+		ctx.strokeStyle = color;
+		
+		//ctx.save();
+		ctx.beginPath();
+		ctx.moveTo(posX,posY);
+		//ctx.lineTo(0,0);
+		//console.log(angle);
+		var angle = 0.01;
+		var num = 100;
+		
+		for (var i=0; i<num; i++) {
+		
+				//if (Math.random()*0.37 > rms) continue; 
+		
+				opening = Math.sin(i*angle)*10;
+			
+				//size = 40+Math.sin(timer/1000)*10+Math.sin(timer*(j-numy*.5)/1000)*10;
+				//ctx.save();
+				var thisx = posX + Math.sin(i*angle+i*(Math.sin(phase2 + 10000)+1.5))*opening*i*2;
+				var thisy = posY + Math.cos(i*angle+i*(Math.sin(phase2 + 10000)+1.5))*opening*i*2;
+				
+				ctx.lineTo(thisx,thisy);
+				
+		}
+		//ctx.closePath();
+		ctx.lineWidth = 10;
+		ctx.stroke();
+		//ctx.restore();
+		
+		var picWidth = 760;
+		var picHeight = 750;
+		var newPicHeight = picHeight*(w/picWidth);
+		var posY = h - newPicHeight - parseInt(phase2*2500,10);
+		//console.log(phase2);
+		if (posY < h) ctx.drawImage(robin[3], 0, posY, w, newPicHeight);
+				
+		
+	}
+	
+	function drawRobinTransition() {
+		ctx.clearRect(0,0,w,h);
+		//ctx.drawImage(robin[4],0,0,w,h);
+		var d = new Date();
+		var timer = d.getTime();
+		
+		/*if (framecounter) {
+			var thisFrameFPS = 1000 / (timer - lastUpdate);
+			if (timer!=lastUpdate){
+				fps += (thisFrameFPS - fps) / fpsFilter;
+				lastUpdate = timer;
+			}
+		}*/
+		
+		phase2 = (firestarter-timer)/300;
+		phase3 = (firestarter-timer)/100;
+		
+		var posX = w*(0.5);
+		var posY = h*(0.5);
+		var size = (posY*.5)*(-Math.cos(phase2)+1.0);
+		//console.log(timer);
+		
+		for (var j=0; j<maxj; j++) {
+			var thissize = posX;
+			thisb = parseInt(Math.sin(phase2*0.5 + j)*35+120, 10);
+			color = "rgba("+(105-thisb)+","+(205-thisb)+",30,"+(0.5*(j/maxj))+")";
+			ctx.fillStyle = color;
+			var opening = Math.sin(j*angle)*10 + j*40 + 100;
+			ctx.save();
+			ctx.translate( posX, posY );
+			ctx.rotate(j+phase3%90);
+			ctx.beginPath();
+			ctx.moveTo(-thissize*.5*j,-thissize*.5*j);
+			ctx.lineTo(0,thissize);
+			ctx.lineTo(thissize*.5*j,-thissize*.5*j);
+			ctx.fill();
+			ctx.closePath();
+			//ctx.restore();
+			
+			thisb = parseInt(Math.sin(phase2*0.5 + j)*35+120, 10);
+			color = "rgba(255,"+(105-thisb)+","+thisb+","+(0.3*(j/maxj))+")";
+			ctx.fillStyle = color;
+			//ctx.save();
+			//ctx.translate( thisx, thisy );
+			ctx.rotate(j+phase3%90);
+			ctx.beginPath();
+			ctx.moveTo(-thissize*.35*j,-thissize*.35*j);
+			ctx.lineTo(0,thissize*.35);
+			ctx.lineTo(thissize*.5*j,-thissize*.35*j);
+			ctx.fill();
+			ctx.closePath();
+			ctx.restore();		
+		}
+		
+		
+		ctx.fillStyle = "#000000";		
+		ctx.beginPath();
+		ctx.arc(posX, posY, size, 0, 2*Math.PI);
+		ctx.fill();
+		ctx.closePath();
+				
+		ctx.fillStyle = "#DDDD00";		
+		ctx.beginPath();
+		ctx.moveTo(posX - size*.45, posY - size*.8);
+		ctx.lineTo(posX + size*.35, posY - size*.8);
+		ctx.lineTo(posX + size*.5,	posY - size*.65);
+		ctx.lineTo(posX + size*.5,	posY - size*.05);
+		ctx.lineTo(posX + size*.35,	posY + size*.15);
+		ctx.lineTo(posX + size*.5,	posY + size*.8);
+		ctx.lineTo(posX + size*.2,	posY + size*.8);
+		ctx.lineTo(posX + size*.05, posY + size*.15);
+		ctx.lineTo(posX - size*.15, posY + size*.15);
+		ctx.lineTo(posX - size*.15, posY + size*.8);
+		ctx.lineTo(posX - size*.45, posY + size*.8);
+		ctx.fill();
+		ctx.closePath();
+		
+		ctx.fillStyle = "#000000";		
+		ctx.beginPath();
+		ctx.moveTo(posX - size*.15, posY - size*.55);
+		ctx.lineTo(posX + size*.2, 	posY - size*.55);
+		ctx.lineTo(posX + size*.2,	posY - size*.1);
+		ctx.lineTo(posX - size*.15,	posY - size*.1);
+		ctx.fill();
+		ctx.closePath();
+		
+	}
+	
+	function drawScene10() {
+		//ctx.clearRect(0,0,w,h);
+		ctx.drawImage(robin[5],0,0,w,h);
+		var d = new Date();
+		var timer = d.getTime();
+		
+		/*if (framecounter) {
+			var thisFrameFPS = 1000 / (timer - lastUpdate);
+			if (timer!=lastUpdate){
+				fps += (thisFrameFPS - fps) / fpsFilter;
+				lastUpdate = timer;
+			}
+		}*/
+		
+		phase2 = (firestarter-timer)/1000;
+		phase3 = (firestarter-timer)/100;
+		
+		// draw spotlight
+		var gray = parseInt((255-rms*100),10);
+		ctx.fillStyle = "rgba("+gray+","+gray+","+gray+",0.5)";
+		var thisx = w*.8 + Math.sin(phase2)*20;
+		var thisy = h*.25;
+		var thissize = h*.125;
+		ctx.save();
+		ctx.beginPath();
+		ctx.arc(thisx, thisy, thissize, 0, 2*Math.PI);
+		ctx.closePath();
+		ctx.fill();
+		ctx.restore();
+		
+		/* spotlight cone attempt, looks like crap
+		//450x950
+		var thiswidth = 450; //(450 / w) * .35;
+		var thisheight = 950; //(950 / h) * .35;
+		ctx.save();
+		//ctx.moveTo(thiswidth,thisheight);
+		//ctx.translate(-thiswidth*.5, -thisheight*.5);
+		ctx.translate(w*1.25,h*.5);
+		ctx.rotate(Math.PI*.7);
+		ctx.drawImage(robin[3], 0, 0, thiswidth, thisheight);
+		ctx.restore();
+		*/
+		
+		// draw robin logo
+		color = "rgba(0,0,0,1.0)";
+		ctx.fillStyle = color;		
+		var thisscale = thissize / (415+10);
+		ctx.save();
+		ctx.translate(thisx,thisy);
+		ctx.scale(thisscale, thisscale);
+		ctx.rotate(0.2);
+		drawRobinLogo();
+		ctx.fill();
+		ctx.restore();
+
+		// draw fake road
+		var gray = parseInt((255-rms*100),10);
+		ctx.fillStyle = "rgba("+(gray+100)+","+(gray+100)+","+(gray-150)+",0.1)";
+		var sizex = thissize*1.83;
+		var sizey = thissize*0.3;
+		for (var thisx=0; thisx<w; thisx += sizex*2 ) {
+			for (var thisy=0; thisy<h; thisy += sizey*2 ) {
+
+				var posX = w - ((timer + thisx*.8 - sizex*Math.sin(phase2 + thisy) + sizex*10 - thissize + thisy*.3) % (w + thissize));
+				var posY = h*.95 + Math.sin(phase2 + thisy)*10 - Math.cos(phase3 + thisx * .3)*8;
+				
+				ctx.save();
+				ctx.translate( posX, parseInt(posY,10) );
+				ctx.beginPath();
+				ctx.moveTo(-sizex*.5,-sizey*.5);
+				ctx.lineTo(-sizex*.5,sizey*.5);
+				ctx.lineTo(sizex*.5,sizey*.5);
+				ctx.lineTo(sizex*.5,-sizey*.5);
+				ctx.closePath();
+				ctx.fill();
+				ctx.restore();
+			}
+		}
+
+		// draw hippo
+		var blit = parseInt((timer/150),10)%2 + 1;
+		ctx.drawImage(robin[blit], w*.15 + (Math.sin(phase2+100)*(Math.cos(phase2)+1.0))*10, (h - w*.35), w*.35, w*.35);	
+	}
+	
+	function drawKapow() {
+		ctx.drawImage(robin[6],0,0,w,h);		
+	}
+
+
+	//
+	// start demo
+	//
+	
+	requestAnimationFrame( animate );
+	document.getElementById('message').innerHTML = '';
+
+	var d = new Date();
+	var lastUpdate = d.getTime();
+	firestarter = lastUpdate;
+	starttime = lastUpdate;
+
+	function animate() {
+		requestAnimationFrame( animate );
+
+		var d = new Date();
+		var thistime = d.getTime();
+		var currtime = (thistime-starttime);
+			
+		var timerOut = document.getElementById('timer');
+		if (timerOut) timerOut.innerHTML = currtime + '<br>' + tap;
+		
+		if (sequenceindex < sequence.length-1) {
+			
+			if (currtime > sequence[sequenceindex+1]["start"]) {
+				sequence[sequenceindex+1]["call"]();
+				sequenceindex++;
+				console.log('jumped to: ' + sequenceindex);
+			}
+		}
+	  
+	  	switch (scene) {
+	  		case -1:
+				ctx.drawImage(robin[4],0,0,w,h);
+			break;
+	  		case 0:
+				drawKaleidoscope();
+			break;
+			case 1:
+				drawMirror();
+			break;
+			case 2:
+				drawCircles();
+			break;
+			case 3:
+				drawRobinSign();
+			break;
+			//case 4:
+			//	drawFlyingTriangles();
+			//break;
+			case 5:
+				drawSpyralFlare();
+			break;
+			case 6:
+				drawFloatingBlob();
+			break;
+			case 7:
+				drawElevators();
+			break;
+			case 8:
+				drawSpyralLine();
+			break;
+			case 9:
+				drawRobinTransition();
+			break;
+			case 10:
+				drawScene10();
+			break;
+			case 11:
+				drawKapow();
+			break;
+		}
+		
+	}
+}
+
+var scene = 10;
+var sequence = [
+
+	// elevators, intro
+	{ "start": 0, "call": function(){ scene = 7; elevatorchange = false; } },
+	{ "start": 1800, "call": function(){ loadLine('shadow bigger','TPOLM'); } },	
+	{ "start": 2200, "call": function(){ loadLine('bigger','TPOLM'); } },
+	{ "start": 4600, "call": function(){ loadLine('shadow normal','presents'); } },
+	{ "start": 5000, "call": function(){ loadLine('normal','presents'); } },
+	{ "start": 7520, "call": function(){ loadLine('shadow big','Dick Grayson\'s<br>darkest<br />secret'); } },
+	{ "start": 7890, "call": function(){ loadLine('big','Dick Grayson\'s<br>darkest<br />secret'); } },
+
+	// kaleidoscope / mirror
+	{ "start": 10000, "call": function(){ scene = 0; seedindex = 25; refire(); clip = true; } },
+	{ "start": 10800, "call": function(){ loadBlank(); clip = false; } },
+	{ "start": 11450, "call": function(){ clip = true; } },
+	{ "start": 12890, "call": function(){ seedindex = 20; clip = false; } },
+	{ "start": 14290, "call": function(){ clip = true; } },
+	{ "start": 15750, "call": function(){ clip = false; } },
+	{ "start": 17170, "call": function(){ scene = 1 } },
+	{ "start": 18620, "call": function(){ seedindex = 15 } },
+	{ "start": 20000, "call": function(){ seedindex = 6; clip = true; } },
+	{ "start": 21450, "call": function(){ scene = 0; } },
+	{ "start": 22880, "call": function(){ clip = false; loadSaying(); } },
+	{ "start": 24300, "call": function(){ scene = 1; seedindex = 27; } },
+	{ "start": 25740, "call": function(){ seedindex = 18; changecolor = true; } },
+	{ "start": 27160, "call": function(){ scene = 0; seedindex = 1; } },
+	{ "start": 28580, "call": function(){ scene = 1; seedindex = 20; clip = true; } },
+	{ "start": 30000, "call": function(){ seedindex = 15; } },
+	{ "start": 31450, "call": function(){ seedindex = 6; changecolor = false; } },
+
+	// robin, i couldn't resist
+	{ "start": 32700, "call": function(){ scene = 9; refire(); loadBlank(); } },
+	{ "start": 34400, "call": function(){ scene = -1; loadTooYoung(); } },
+	{ "start": 35400, "call": function(){ loadTooYoung2(); } },
+	{ "start": 36400, "call": function(){ loadTooYoung3(); } },
+	{ "start": 37100, "call": function(){ loadTooYoung4(); } },
+	
+	// spyral lines
+	{ "start": 37700, "call": function(){ scene = 8; loadBlank(); refire(); } },
+	{ "start": 47000, "call": function(){ loadSaying(); } },
+	
+	// circles
+	{ "start": 53000, "call": function(){ scene = 9; refire(); loadBlank(); } },
+	{ "start": 54700, "call": function(){ scene = 2; } },
+	{ "start": 57500, "call": function(){ scene = 11; } },
+	{ "start": 58000, "call": function(){ scene = 2; } },	
+	{ "start": 59000, "call": function(){ loadSaying(); } },
+	
+	// blob
+	{ "start": 62300, "call": function(){ scene = 9; refire(); loadBlank(); } },
+	{ "start": 64000, "call": function(){ scene = 6; } },
+	{ "start": 68300, "call": function(){ loadSaying(); } },
+	//{ "start": 66420, "call": function(){ loadSaying(); } },
+
+	// spinning robin logo
+	{ "start": 71600, "call": function(){ scene = 9; refire(); loadBlank(); } },
+	{ "start": 73300, "call": function(){ scene = 3; } },
+	{ "start": 77600, "call": function(){ loadSaying(); } },
+
+	// elevators different seed
+	{ "start": 80900, "call": function(){ scene = 9; refire(); loadBlank(); } },
+	{ "start": 82600, "call": function(){ scene = 7; elevatorchange = true; } },
+	{ "start": 84300, "call": function(){ loadSaying(); } },
+
+	// spyral flare
+	{ "start": 87600, "call": function(){ scene = 9; refire(); loadBlank(); } },
+	{ "start": 89300, "call": function(){ scene = 5; } },
+	{ "start": 93600, "call": function(){ loadSaying(); } },
+
+	// scene 10
+	{ "start": 96900, "call": function(){ scene = 9; refire(); loadBlank(); } },
+	{ "start": 98600, "call": function(){ scene = 10; } },
+	{ "start": 99900, "call": function(){ loadGreetings(); } },
+	{ "start":100700, "call": function(){ loadGreetings(); } },
+	{ "start":101500, "call": function(){ loadGreetings(); } },
+	{ "start":102300, "call": function(){ loadGreetings(); } },
+	{ "start":103100, "call": function(){ loadGreetings(); } },
+	{ "start":103900, "call": function(){ loadGreetings(); } },
+	{ "start":104700, "call": function(){ loadGreetings(); } },
+	{ "start":105500, "call": function(){ loadGreetings(); } },
+	{ "start":106300, "call": function(){ loadGreetings(); } },
+	{ "start":107100, "call": function(){ loadGreetings(); } },
+	{ "start":107900, "call": function(){ loadGreetings(); } },
+	{ "start":108700, "call": function(){ loadGreetings(); } },
+	{ "start":109500, "call": function(){ loadGreetings(); } },
+	{ "start":110300, "call": function(){ loadGreetings(); } },
+	{ "start":111100, "call": function(){ loadGreetings(); } },
+	{ "start":111900, "call": function(){ loadGreetings(); } },
+	{ "start":112700, "call": function(){ loadGreetings(); } },
+	{ "start":113500, "call": function(){ loadGreetings(); } },
+	{ "start":114300, "call": function(){ loadGreetings(); } },
+	{ "start":115100, "call": function(){ loadGreetings(); } },
+	{ "start":115900, "call": function(){ loadGreetings(); } },
+	{ "start":116700, "call": function(){ loadGreetings(); } },
+	{ "start":117500, "call": function(){ loadBlank(); } },
+
+
+	{ "start":119000, "call": function(){ backgroundAudio.stop(0); scene = -1; loadGoodbye(); } },
+	{ "start":120500, "call": function(){ loadGoodbye2(); } },
+	{ "start":122000, "call": function(){ loadGoodbye3(); } },
+	
+	// don't loop audio
+	//{ "start":119000, "call": function(){ backgroundAudio.stop(); } },
+
+];
+var sequenceindex = -1;
+
+window.onresize = resize;
+
+function resize() {
+	w = window.innerWidth;
+	h = window.innerHeight;
+	
+	var canvas = document.getElementById("canvas");
+	canvas.setAttribute("width", w);
+	canvas.setAttribute("height", h);
+	
+	ctx = canvas.getContext("2d");
+	ctx.width = w;
+	ctx.height = h;
+	
+	centerX = w*(0.5);
+	centerY = h*(0.5);
+	oangle = Math.asin( centerX / Math.sqrt(centerX*centerX+centerY*centerY) ) * 2;
+}
+
+/*if (framecounter) {
+	setInterval(function(){
+		var fpsOut = document.getElementById('fps');
+		if (fpsOut) fpsOut.innerHTML = fps.toFixed(1);
+	}, 1000);
+}*/
+
+function loadLine(thisclass, thistext) {
+	var content = '';
+ 	content += '<span class="'+thisclass+'">'+thistext+'</span><br />';
+ 	document.getElementById('message').innerHTML = content;
+}
+
+function loadBlank() {
+	loadLine('','');
+}
+
+function loadSaying() {
+	loadLine('',sayings[rand(sayings.length)]);
+}
+
+function loadTooYoung() {
+  	var content = '';
+ 	content += '<span>i couldn\'t resist</span><br /><br />';
+ 	content += '<br />';
+ 	content += '';
+ 	document.getElementById('message').innerHTML = content;
+}
+
+// one teacher of mine once told me there should never be a 2 in a variable or function
+// without having a corresponding 1, otherwise things would be confusing
+// i disagree with the logic in that and refuse to refactor such names
+
+function loadTooYoung2() {
+  	var content = '';
+ 	content += '<span>i couldn\'t resist</span><br /><br />';
+ 	content += '<span>you were taken in by her</span><br />';
+ 	content += '';
+ 	document.getElementById('message').innerHTML = content;
+}
+
+function loadTooYoung3() {
+  	var content = '';
+ 	content += '<span>i couldn\'t resist</span><br /><br />';
+ 	content += '<span>you were taken in by her</span><br />';
+ 	content += '<span>but,</span>';
+ 	document.getElementById('message').innerHTML = content;
+}
+
+function loadTooYoung4() {
+  	var content = '';
+ 	content += '<span>i couldn\'t resist</span><br /><br />';
+ 	content += '<span>you were taken in by her</span><br />';
+ 	content += '<span>but, i\'m too young</span>';
+ 	document.getElementById('message').innerHTML = content;
+}
+
+var greetings = [
+'Accession','ananamurska','ASD',
+'Batman Group','Brainstorm','tpolm',
+'Conspiracy','Deadliners','Dekadence',
+'Desire','flo','jumalauta',
+'kewlers','Komplex','matt current',
+'mercury','mfx','Orange',
+'pwp','spaceballs','tpolm',
+'trilobit'];
+var gindex = 0;
+
+function loadGreetings() {
+	loadLine('greet', 'Holy '+greetings[gindex] );
+	gindex++;
+	if (gindex >= greetings.length) gindex = 0;
+}
+
+function loadGoodbye() {
+  	var content = '';
+ 	content += '<span>Dick Grayson</span><br />';
+ 	content += '<span>has left the building</span><br />';
+ 	document.getElementById('message').innerHTML = content;
+}
+
+function loadGoodbye2() {
+  	var content = '';
+ 	content += '<span>thank you</span><br />';
+ 	content += '<span>goodnight</span><br />';
+ 	document.getElementById('message').innerHTML = content;
+}
+
+function loadGoodbye3() {
+  	var content = '';
+ 	content += '<span>ps / tpolm</span><br />';
+ 	content += '<span>dascon / deadliners & desire</span><br />';
+ 	content += '<span>fthr / tpolm</span><br />';
+ 	content += '<span>optic / tpolm</span>';
+ 	document.getElementById('message').innerHTML = content;
+}
+
+function refire() {
+	var d = new Date();
+	firestarter = d.getTime();
+}
+
+function retap() {
+	var d = new Date();
+	tap = d.getTime() - starttime;
+	console.log('new tap: ' + tap);
+}
+
+document.onkeyup = function(event) {
+    console.log(event.keyCode);
+    switch(event.keyCode) {
+    	case 32: //spacebar
+    		retap();
+    	break;
+    	case 49: //1
+    		scene = 0;
+    	break;
+    	case 50: //2
+    		scene = 1;
+    	break;
+    	case 51: //3
+    		scene = 2;
+    	break;
+    	case 52: //4
+    		refire();
+    		scene = 3;
+    	break;
+    	case 53: //5
+    		scene = 4;
+    	break;
+    	case 54: // 6
+    		scene = 5;
+    	break;
+    	case 55: //7
+    		scene = 6;
+    	break;
+    	case 56: //8
+    		refire();
+    		scene = 7;
+    	break;
+    	case 57: //9
+    		refire();
+    		scene = 8;
+    	break;
+    	case 48: //0
+    		refire();
+    		scene = 9;
+    	break;
+    	case 81: //q
+    		refire();
+    		scene = 10;
+    		loadGreetings();
+    	break;
+    }
+};
+/*
+var mouseX = 0;
+var mouseY = 0;
+document.onmousemove = function (e) {mousePos(e);};
+function mousePos (e) {
+	mouseX = e.pageX; 
+    mouseY = e.pageY;
+    return true;
+}
+*/
+  </script>
+ </head>
+ <body onload="init()">
+ 	<div class="aligncenter">
+   		<canvas id="canvas" width="800" height="600"></canvas>
+   		<div id="message">loading your momma on a leash...</div>
+   	</div>
+   	<!--<div id="fps"></div>
+   	<div id="timer"></div>-->
+ </body>
+</html>
